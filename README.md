@@ -1,1 +1,1 @@
-Variant of partial evaluation for a simple block-structured language. Implementation is mostly taken from the description of an online partial evaluator given in "Partial Evaluation: Practice and Theory".
+Variant of partial evaluation for a simple block-structured language. Implementation is mostly taken from the description of an online partial evaluator given in "Partial Evaluation: Practice and Theory". Work in progress.
