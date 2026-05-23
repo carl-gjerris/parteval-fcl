@@ -1,0 +1,41 @@
+
+alloc(x, 100);
+
+while i < codelen {
+    if code[i] = const {
+        i := i + 1;
+        stack[sp] := code[i];
+        sp := sp + 1;
+    }
+    if code[i] = var {
+        i := i + 1;
+        stack[sp] := stack[code[i]];
+        sp := sp + 1;
+    }
+    if code[i] = jump {
+        i := i + 1;
+        i := stack[code[i]];
+        i := i - 1;
+    }
+    if code[i] = add {
+        sp := sp - 1;
+        stack[sp] := stack[sp+1] + stack[sp];
+    }
+    if code[i] = mul {
+        sp := sp - 1;
+        stack[sp] := stack[sp+1] * stack[sp];
+    }
+    if code[i] = minus {
+        sp := sp - 1;
+        stack[sp] := stack[sp+1] - stack[sp];
+    }
+    if code[i] = alloc {
+        alloc(stack[sp], stack[sp]);
+        stack[sp] := stack[sp+1] - stack[sp];
+    }
+    if code[i] = free {
+        free(stack[sp]);
+        sp := sp - 1;
+    }
+
+}

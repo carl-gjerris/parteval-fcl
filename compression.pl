@@ -1,37 +1,38 @@
 
 
-
-compression(Bl1-Jmp1, Bl2-Jmp2, Bl-Jmp2) :- append(Bl1, Bl2).
-
-single_source(Lbl) :-
-    findall(Jmp,
-        (residue(_, Body-Jmp),
-            (
-                Jmp = jmp(Lbl)
-            ;
-                Jmp = ift(_, Th, El), (Th = Lbl; El = Lbl))
-            ),
-        Bg),
-    length(Bg, L),
-    L = 1.
-
+%
+%compression(Bl1-_, Bl2-Jmp2, Bl-Jmp2) :- append(Bl1, Bl2, Bl).
+%
+%single_source(Lbl) :-
+%    findall(Jmp,
+%        (residue(_, Body-Jmp),
+%            (
+%                Jmp = jmp(Lbl)
+%            ;
+%                Jmp = ift(_, Th, El), (Th = Lbl; El = Lbl))
+%            ),
+%        Bg),
+%    length(Bg, L),
+%    L = 1.
+%
 :- dynamic compressed/2.
 
-compress_aux(Lbl, Block) :- 
+compress_aux(Lbl, Block-Djump) :- 
     residue(Lbl, Body-Jump),
     Jump = jmp(Dest),
-    compress_aux(Dest, Destblock),
+    compress_aux(Dest, Destblock-Djump),
     append(Body, Destblock, Block).
 
 compress_aux(Lbl, Body-Jump) :- 
     residue(Lbl, Body-Jump),
-    (Jump = ift(Cond, Th, El); Jump = hlt).
+    (Jump = ift(_, _, _); Jump = hlt).
 
 :- dynamic mark/3.
 
 compress(Lbl) :-
     compress_aux(Lbl, Body-Jump),
-    assertz(compressed, Body-Jump),
+    write(Body-Jump),
+    assertz(compressed(Lbl, Body-Jump)),
     (
         Jump = ift(Cond, Th, El),
         \+ mark(Cond, Th, El),

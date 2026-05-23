@@ -1,27 +1,43 @@
 
-state([A]), [A] --> [A].
-state(S0, S1) --> 
+
+just(X, Y, X, Y).
+subst(X, Y, T, T0) :- mapsubterms(just(X, Y), T, T0).
+
 zip([], [] ,[]).
 zip([Hd | Tl], [H | T] ,[Hd-H | Nt]) :- zip(Tl, T, Nt).
 mgx(Temp, Var, Arg, Ntemp) :- copy_term(Temp-Var, Ntemp-V), V = Arg.
 
-
-lgen(lbl(B)) --> {gensym(lbl, B)}, [B].
+lgen(B) --> {gensym(lbl, B)}, [lbl(B)].
 
 test --> [a], [a], [b].
 lower(if(Cond, Then, Else)) -->
     [ift(Cond, T, E)],
     lgen(T), 
     lower(Then),
+    [jmp(Exit)],
     lgen(E),
-    lower(Else).
+    lower(Else),
+    [jmp(Exit)],
+    lgen(Exit).
 
+lower(if(Cond, Then)) -->
+    [ift(Cond, T, E)],
+    lgen(T), 
+    lower(Then),
+    [jmp(E)],
+    lgen(E).
 
 lower(while(Cond, Body)) -->
     [ift(Cond, B, E)],
     lgen(B),
     lower(Body),
+    [ift(Cond, B, E)],
     lgen(E).
+
+lower(X) -->
+    {X = alloc(_, _); X = assn(_, _);
+    X = free(_); X = lift(_)},
+    [X].
 
 lower([Hd | Tl]) --> lower(Hd), lower(Tl).
 
@@ -29,30 +45,24 @@ lower(assn(X, E)) --> [assn(X, E)].
 
 lower([]) --> [].
 
-lower(call(P, Args)) -->
-    push(Args),
-    [jmp(P)],
-    pop(Args).
-
-rnm_arg(Args, Arg stack(Ind)) :-
-    nth0(Ind, Args, Arg).
-
-rnm_arg(Args, Body, Nbody) :- 
-    mapsubterm(rnm_arg(Args), Body, Nbody).
-
-lower(proc(Nm, Args, Body)) -->
-    [lbl(Nm)],
-    {rnm_args(Args, Body, Nbody)},
-    lower(Nbody),
-    [return].
-
 genblock([lbl(L)|Body], Jmp) :-
     assertz(prog(L, Body-Jmp)).
 
+lift(Prog) :- lift([lbl(ss__) | Prog], []).
+
+
+deli(i(V), V).
+
 lift([Hd | Tl], Acc) :-
-    (Hd = jmp(_); Hd = ift(_, _, _), Hd = return),
-    genblock(Acc, Hd), !.
+    (Hd = jmp(_); Hd = ift(_, _, _); Hd = return; Hd = hlt),
+    reverse(Acc, Acc0),
+    genblock(Acc0, Hd), !, lift(Tl, []).
 
 lift([Hd | Tl], Acc) :-
     lift(Tl, [Hd|Acc]).
+
+lift([], Acc) :-
+    reverse(Acc, Acc0),
+    genblock(Acc0, hlt).
+
 

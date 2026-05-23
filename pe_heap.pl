@@ -1,8 +1,11 @@
 :- use_module(library(reif)).
 
-rep(X, u, u).
-rep(X, 0, []).
+rep(_, u, u).
+rep(_, 0, []).
 rep(X, I, [X|Tl]) :- I > 0, J is I - 1, rep(X, J, Tl).
+
+
+
 
 setnth(0, X, [_|Tl], [X|Tl]).
 setnth(I, X, [El|Tl], [El|Res]) :-
@@ -14,12 +17,11 @@ gsv(X) :- gensym(x, X).
 
 emp(E) :- list_to_assoc([], E).
 
-ev_aux(i(I), St, I).
-ev_aux(rf(V), St-Heap, I) :- get_assoc(V, St, i(I)).
+ev_aux(rf(V), St-_, I) :- get_assoc(V, St, I).
 ev_aux(mem(Ptr, Ind), St-Heap, I) :-
     Heap = u, I = u
     ;
-    get_assoc(Ptr, St, Ptrval),
+    ev(Ptr, St-Heap, Ptrval),
     ev(Ind, St-Heap, Indval),
     (
         (Ptrval = u; Indval = u),
@@ -29,38 +31,90 @@ ev_aux(mem(Ptr, Ind), St-Heap, I) :-
         (nth0(Ind, Block, I); Block = u, I = u)
     ).
 
-ev_aux(ope(Op, L, R), St, V) :-
+ev_aux(op(Op, [L, R]), St, V) :-
     ev_aux(L, St, Lv),
     ev_aux(R, St, Rv),
+    ((Rv = u; Lv = u), V = u  
+    ;
     (
-        Op = plus, V is Lv + Rv
+        Op = "+", V is Lv + Rv
     ;
-        Op = minus, V is Lv - Rv
+        Op = "-", V is Lv - Rv
     ;
-        Op = mul, V is Lv * Rv
+        Op = "*", V is Lv * Rv
     ;
-        Op = div, V is Lv / Rv
+        Op = "/", V is Lv / Rv
+    ;
+        Op = "<", (Lv < Rv, V = 1, !; V = 0)
+    ;
+        Op = ">", (Lv < Rv, V = 1, !; V = 0)
+    ;
+        Op = "=", (Lv = Rv, V = 1, !; V = 0)
+    )), !.
+
+ev_aux(I, _, I).
+
+ev(E, St, V) :- ev_aux(E, St, V), !.
+ev(E, St, u) :- ev_aux(E, St, u), !.
+ev(_, _, u).
+
+set(X, Val, St-Heap, Stn) :-
+    X = rf(V),
+    put_assoc(V, St, Val, St0),
+    Stn = St0-Heap, !
+;
+    X = mem(Ptr, Ind),
+    Stn = St-Heap0,
+    ev(Ptr, St-Heap, Ptrval),
+    ev(Ind, St-Heap, Indval),
+    (
+        Ptrval = u,
+        Heap0 = u, !
+    ;
+        Indval = u,
+        get_assoc(Ptrval, Heap, Mem),
+        length(Mem, K),
+        rep(Val, K, Mem0),
+        put_assoc(Ptrval, Heap, Mem0, Heap0)
+    ;
+        get_assoc(Ptrval, Heap, Mem),
+        setnth(Indval, Val, Mem, Mem0),
+        put_assoc(Ptrval, Heap, Mem0, Heap0)
     ).
 
-ev(E, St, i(V)) :- ev_aux(E, St, V), !.
-ev(E, St, u) :- ev_aux(E, St, u), !.
-ev(E, St, u).
+
+uninit(N, Heap, Ptr, Heap0) :-
+    (var(Ptr), gptr(Ptr), !; true),
+(
+    N \= u,
+    rep(u, N, Uninit),
+    put_assoc(Ptr, Heap, Uninit, Heap0), !
+;
+    N = u,
+    put_assoc(Ptr, Heap, u, Heap0)).
+
+
 
 rb([], [], St, St). 
 
-rb([lift(rf(V))|Stms], Stms, St-Heap, Stn) :-
-    put_assoc(V, St, u, Stn).
+rb([alloc(X, E)|Stms], Nstms, St-Heap, Stn) :-
+    ev(E, St-Heap, Ev),
+    uninit(Ev, Heap, Ptr, Heap0),
+    set(X, Ptr,St-Heap0, Store0),
+    Nstms = [alloc(X, E) | Stms0],
+    rb(Stms, Stms0, Store0, Stn).
 
-rb([free(rf(V))|Stms], Nstms, St-Heap, Stn) :-
-    get_assoc(V, St, Ptr),
+rb([free(X)|Stms], Nstms, St-Heap, Stn) :-
+    ev(X, St-Heap, Ptr),
     del_assoc(Ptr, Heap, _, Heap0),
-    Nstms = [free(rf(V)) | Stms0],
+    Nstms = [free(rf(X)) | Stms0],
     rb(Stms, Stms0, St-Heap0, Stn).
 
-rb([free(rf(V))|Stms], Nstms, St-Heap, Stn) :-
-    get_assoc(V, St, Ptr),
+rb([free(X)|Stms], Nstms, St-Heap, Stn) :-
+    ev(X, St-Heap, Ptr),
     Ptr = u,
-    Nstms = [free(rf(V)) | Stms0],
+    write('WARNING: freeing unknown\n'),
+    Nstms = [free(rf(X)) | Stms0],
     rb(Stms, Stms0, St-u, Stn).
 
 rb([free(rf(V))|Stms], Nstms, St-Heap, Stn) :-
@@ -68,59 +122,20 @@ rb([free(rf(V))|Stms], Nstms, St-Heap, Stn) :-
     Nstms = [free(rf(V)) | Stms0],
     rb(Stms, Stms0, St-u, Stn).
 
-rb([alloc(rf(V), N)|Stms], Nstms, St-Heap, Stn) :-
-    gptr(P), 
-    put_assoc(V, St, i(P), St0),
-    rep(u, N, Uninit),
-    put_assoc(i(P), Heap, Uninit, Heap0),
-    Nstms = [alloc(rf(V, N)) | Stms0],
-    rb(Stms, Stms0, St0-Heap0, Stn).
-
-%rb([alloc(rf(V), N)|Stms], Nstms, St-u, Stn) :-
-%    gptr(P), 
-%    put_assoc(V, St, P, St0),
-%    Nstms = [alloc(rf(V, N)) | Stms0],
-%    rb(Stms, Stms0, St0-u, Stn).
-%
-%
-rb([assn(rf(V), E)|Stms0], Nstms, St, Stn) :-
-    ev(E, St, Val),
+rb([assn(X, E)|Stms0], Nstms, Store, Final) :-
+    ev(E, Store, Val),
     (
-        Val = u, Nstms = [assn(rf(V), E)|Stms]
-    ; 
-        Val = i(I), Nstms = [assn(rf(V), Val)|Stms]
-    ),
-    St = Store-Heap,
-    put_assoc(V, Store, Val, Stn0),
-    rb(Stms0, Stms, Stn0-Heap, Stn).
-
-rb([assn(mem(Ptr, Ind), E)|Stms0], Nstms, St, Stn) :-
-    ev(Ptr, St, Ptrval),
-    ev(Ind, St, Indval),
-    ev(E, St, Rval),
-    St = Store-Heap,
-    (
-        Rval = u, Nstms = [assn(mem(Ptr, Ind), E)|Stms]
-    ; 
-        Rval = i(I), Nstms = [assn(mem(Ptr, Ind), Rval)|Stms]
-    ),
-    (
-        Ptrval = u,
-        Heap0 = u
+        Val = u, Nstms = [assn(X, E)|Stms], !
     ;
-        Indval = u,
-        get_assoc(Ptrval, Heap, Mem),
-        length(Mem, K), 
-        rep(u, K, Mem0),
-        put_assoc(Ptrval, Heap, Mem0, Heap0)
-    ;
-        get_assoc(Ptrval, Heap, Mem),
-        Indval = i(Iv),
-        setnth(Iv, E, Mem, Mem0),
-        put_assoc(Ptrval, Heap, Mem0, Heap0)
+        Val \= u, Nstms = [assn(X, Val)|Stms]
     ),
-    rb(Stms0, Stms, Store-Heap0, Stn).
+    set(X, Val, Store, Store0),
+    rb(Stms0, Stms, Store0, Final).
 
+
+
+rb(Block, Nblock, Stn) :- 
+    emp(St), emp(Heap), rb(Block, Nblock, St-Heap, Stn).
 
 :- dynamic residue/2.
 :- dynamic prog/2.
@@ -140,7 +155,7 @@ sname(Label, Store-Heap, Name) :-
 
 :- table rnm/2.
 rnm(Lbl, Sym) :-
-    Lbl = init, Sym = init
+    Lbl = 'ss__[][]', Sym = ss__, !
 ;
     gensym(blk, Sym), residue(Lbl, _).
 
@@ -171,15 +186,14 @@ pe(Label, Store) :-
         assertz(residue(Name, Nbody-ift(E, Thn, Eln))),
         pe(Th, Stn), pe(El, Stn)
     ;
-        Jump = ift(E, Th, El),
-        ev(E, Stn, i(I)), I \= 0,
-        write(I), nl,
+        Jump = ift(E, Th, _),
+        ev(E, Stn, I), I \= 0,
         sname(Th, Stn, Thn),
         assertz(residue(Name, Nbody-jmp(Thn))),
         pe(Th, Stn)
     ;
-        Jump = ift(E, Th, El),
-        ev(E, Stn, i(Null)), (Null = 0; Null = null),
+        Jump = ift(E, _, El),
+        ev(E, Stn, Null), (Null = 0; Null = null),
         sname(El, Stn, Eln),
         assertz(residue(Name, Nbody-jmp(Eln))),
         pe(El, Stn)
@@ -191,3 +205,6 @@ pe(Label, Store) :-
         Jump = hlt,
         assertz(residue(Name, Nbody-hlt))
     ).
+
+
+pe() :- emp(St), emp(Heap), pe(ss__, St-Heap).
