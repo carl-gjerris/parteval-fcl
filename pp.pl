@@ -3,26 +3,6 @@
 :- set_prolog_flag(double_quotes, chars).
 
 
-digit(C) --> [C], {char_type(C, digit)}.
-nlit(C) --> digit(C).
-nlit(N) --> digit(C), nlit(Ns), {atom_concat(C, Ns, N)}.
-nlitn(Lit) --> nlit(N), {atom_number(N, Lit)}.
-symb(Smb) -->
-    [S], {char_type(S, alpha)}, symb(Mb), 
-    {atom_concat(S, Mb, Smb)}.
-
-symb(S) --> [S], {char_type(S, alpha)}.
-
-wso --> 
-    [C],
-    {C = ' '; C = '\t'; C = '\n'},
-    ws.
-ws --> [].
-ws --> 
-    [C],
-    {C = ' '; C = '\t'; C = '\n'}, !,
-    ws.
-
 
 
 
@@ -32,7 +12,7 @@ pp(mem(rf(Ptr), Ind)) --> pp(rf(Ptr)), "[", pp(Ind), "]".
 pp(op(Sym, [L, R])) --> "(", pp(L), Sym, pp(R), ")".
 
 pp(while(Cond, Body)) --> "while",
-    wso, expr(Cond), wso,
+    " ", expr(Cond), " ",
     "{", body(Body), "}", "\n".
 
 
@@ -46,9 +26,9 @@ pp(alloc(X, N)) -->
 pp(free(X)) -->
     "free(", 
     pp(X), 
-    ")",  ";".
+    ")",  ";\n".
 
-pp([St|Stmts]) --> ws, pp(St), ws, pp(Stmts), ws.
+pp([St|Stmts]) --> pp(St), pp(Stmts).
 pp([]) --> [].
 
 pp(hlt) --> "hlt", ".\n".
@@ -59,3 +39,11 @@ pp(ift(E, Th, El)) --> "if",
                     " ", "else", " ", pp(El), ".\n".
 
 pp(X) --> [X].
+
+ppe([St|Stmts]) --> ppe(St), ppe(Stmts).
+ppe([]) --> [].
+ppe(Lbl-Body-Jump) -->
+    [Lbl], ":\n", pp(Body), pp(Jump).
+
+
+

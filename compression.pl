@@ -27,20 +27,23 @@ compress_aux(Lbl, Body-Jump) :-
     residue(Lbl, Body-Jump),
     (Jump = ift(_, _, _); Jump = hlt).
 
-:- dynamic mark/3.
+:- dynamic mark/4.
 
 compress(Lbl) :-
     compress_aux(Lbl, Body-Jump),
-    write(Body-Jump),
-    assertz(compressed(Lbl, Body-Jump)),
+    (\+ compressed(Lbl, Body-Jump),
+        assertz(compressed(Lbl, Body-Jump)), !; true),
+    write(Lbl-Body-Jump), nl, nl,
     (
         Jump = ift(Cond, Th, El),
-        \+ mark(Cond, Th, El),
-        assertz(mark(Cond, Th, El)),
+        \+ mark(Lbl, Cond, Th, El),
+        assertz(mark(Lbl, Cond, Th, El)),
         compress(Th),
-        compress(El)
+        compress(El), !
     ;
-        Jump = hlt
+        Jump = hlt, !
+    ;
+        true
     ).
 
 

@@ -128,6 +128,9 @@ stmt(switch(Expr, Cases)) -->
 body([St|Stmts]) --> ws, stmt(St), ws, body(Stmts), ws.
 body([]) --> [].
 
+bodyf([St|Stmts]) --> ws, (stmt(St) | brnch(St)), ws, bodyf(Stmts), ws.
+bodyf([]) --> [].
+
 brnch(hlt) --> "hlt", ws, ".".
 brnch(jmp(Target)) --> "jmp", wso, symb(Target), ws,".".
 
@@ -156,16 +159,4 @@ fullprog(Types-Inps-Out-Prog) -->
     idecls(Inps),
     outdecl(Out),
     pprog(Prog).
-
-chars_from_stream(Stream, [C|Chars]) :- 
-    get_char(Stream, C), C \= end_of_file, !, chars_from_stream(Stream, Chars).
-    
-chars_from_stream(Stream, []) :- 
-    get_char(Stream, C), C = end_of_file.
-
-
-
-read_file(Inname, Chars) :-
-    open(Inname, read, Stream),
-    chars_from_stream(Stream, Chars).
 

@@ -41,15 +41,12 @@ lower(X) -->
 
 lower([Hd | Tl]) --> lower(Hd), lower(Tl).
 
-lower(assn(X, E)) --> [assn(X, E)].
-
 lower([]) --> [].
 
 genblock([lbl(L)|Body], Jmp) :-
     assertz(prog(L, Body-Jmp)).
 
 lift(Prog) :- lift([lbl(ss__) | Prog], []).
-
 
 deli(i(V), V).
 
@@ -65,4 +62,4 @@ lift([], Acc) :-
     reverse(Acc, Acc0),
     genblock(Acc0, hlt).
 
-
+   

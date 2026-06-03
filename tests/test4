@@ -1,0 +1,23 @@
+
+stop := 0;
+sub := 1;
+mul := 2;
+add := 3;
+push := 4;
+result := 0;
+sp := 0;
+
+while code[i] {
+    if code[i] = push {
+        i := i + 1;
+        sp := sp + 1;
+        st[sp] := code[i]
+    }
+    if code[i] = add {
+        result := st[sp] + st[sp-1];  
+        sp := sp - 1;
+        st[sp] := result;
+    }
+    i := i + 1;
+}
+

@@ -12,7 +12,7 @@ setnth(I, X, [El|Tl], [El|Res]) :-
     J is I - 1, 
     setnth(J, X, Tl, Res).
 
-gptr(P) :- gensym(p, P).
+gptr(ptr(P)) :- gensym(p, P).
 gsv(X) :- gensym(x, X).
 
 emp(E) :- list_to_assoc([], E).
@@ -23,12 +23,14 @@ ev_aux(mem(Ptr, Ind), St-Heap, I) :-
     ;
     ev(Ptr, St-Heap, Ptrval),
     ev(Ind, St-Heap, Indval),
+    write(Ptrval), nl, write(Indval), nl,
     (
         (Ptrval = u; Indval = u),
         I = u
     ;
-        get_assoc(Ptr, Heap, Block),
-        (nth0(Ind, Block, I); Block = u, I = u)
+        get_assoc(Ptrval, Heap, Block),
+        write(Block),
+        (nth0(Indval, Block, I); Block = u, I = u)
     ).
 
 ev_aux(op(Op, [L, R]), St, V) :-
@@ -57,6 +59,21 @@ ev_aux(I, _, I).
 ev(E, St, V) :- ev_aux(E, St, V), !.
 ev(E, St, u) :- ev_aux(E, St, u), !.
 ev(_, _, u).
+
+:- dynamic(quota/2).
+
+dec(X) :- 
+    quota(X, 0), !.
+
+dec(X) :-
+    quota(X, I),
+    J is I - 1,
+    retract(quota(X, I)),
+    assertz(quota(X, J)), !.
+
+
+dec(X) :-
+    assertz(quota(X, 10)).
 
 set(X, Val, St-Heap, Stn) :-
     X = rf(V),
@@ -123,9 +140,17 @@ rb([free(rf(V))|Stms], Nstms, St-Heap, Stn) :-
     rb(Stms, Stms0, St-u, Stn).
 
 rb([assn(X, E)|Stms0], Nstms, Store, Final) :-
-    ev(E, Store, Val),
+    (X = mem(_, _), Rf = heap; Rf = X),
+    dec(Rf), 
+    quota(Rf, I),
+    ev(E, Store, Val0),
+    write(E), nl,
+    (I = 0, Val = u, !; Val = Val0),
+    write(Val), nl,
     (
         Val = u, Nstms = [assn(X, E)|Stms], !
+    ;
+        Val = ptr(_), Nstms = [assn(X, E)|Stms], !
     ;
         Val \= u, Nstms = [assn(X, Val)|Stms]
     ),
